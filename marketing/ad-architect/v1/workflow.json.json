@@ -1,0 +1,331 @@
+{
+  "name": "Ad Architect - Campaign Generator",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ad-architect",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "05d77f94-a2da-4037-a63e-a8c5281abbe7",
+      "name": "Campaign Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "8ec98530-d114-4449-b90c-1f3e65c81665"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Create an advertising campaign based on this brief (JSON):\n\n{{ JSON.stringify($json.body) }}\n\nFor EACH platform listed in the brief's \"platforms\" array, produce 2 distinct ad variations. Respect platform character norms, apply the brand_voice, and use the given cta. Also write one concise overall strategy summary.",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are \"Ad Architect\", an elite advertising copywriter and strategist. You write high-converting, platform-appropriate ad copy. Hooks grab attention in the first 3 words, body copy focuses on benefits, and every ad has one clear CTA. Always return valid structured output."
+        }
+      },
+      "id": "ff4c7fd9-a5ff-4a00-99d6-f84f6a6e3c6a",
+      "name": "Ad Architect Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5-mini"
+        },
+        "builtInTools": {},
+        "options": {
+          "temperature": 0.8
+        }
+      },
+      "id": "04188965-6533-4b59-8499-c517de3c268c",
+      "name": "GPT Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        128,
+        224
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "kNWhpvzXrUY2wOVF",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\"type\":\"object\",\"properties\":{\"strategy\":{\"type\":\"string\",\"description\":\"Concise campaign strategy summary covering audience insight, positioning and messaging angle\"},\"ads\":{\"type\":\"array\",\"description\":\"One or more ad variations per requested platform\",\"items\":{\"type\":\"object\",\"properties\":{\"platform\":{\"type\":\"string\",\"description\":\"meta | google | tiktok | linkedin | twitter\"},\"headline\":{\"type\":\"string\"},\"body\":{\"type\":\"string\"},\"cta\":{\"type\":\"string\"},\"image_prompt\":{\"type\":\"string\",\"description\":\"Prompt for generating an ad image\"},\"predicted_score\":{\"type\":\"number\",\"description\":\"Predicted performance score 1-10\"}},\"required\":[\"platform\",\"headline\",\"body\",\"cta\"]}}},\"required\":[\"strategy\",\"ads\"]}"
+      },
+      "id": "48ab29d2-f581-438c-b818-81ebb9ff67cd",
+      "name": "Campaign Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [
+        368,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const agent = $input.first().json.output || {};\nconst brief = $('Campaign Webhook').first().json.body || {};\nconst strategy = agent.strategy || '';\nconst ads = Array.isArray(agent.ads) ? agent.ads : [];\nconst generatedAt = new Date().toISOString();\nconst rows = ads.map((ad) => ({\n  campaign_name: brief.campaign_name || '',\n  product_service: brief.product_service || '',\n  objective: brief.campaign_objective || '',\n  platform: ad.platform || '',\n  headline: ad.headline || '',\n  body: ad.body || '',\n  cta: ad.cta || brief.cta || '',\n  image_prompt: ad.image_prompt || '',\n  predicted_score: ad.predicted_score != null ? ad.predicted_score : '',\n  landing_page: brief.landing_page || '',\n  strategy: strategy,\n  generated_at: generatedAt,\n}));\nreturn rows.length ? rows.map((json) => ({ json })) : [{ json: { campaign_name: brief.campaign_name || '', strategy, generated_at: generatedAt } }];"
+      },
+      "id": "0cb898a5-68c9-4063-846d-8e1f2b4a1350",
+      "name": "Flatten Ads To Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        576,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "",
+          "cachedResultName": "Ad Architect Campaigns"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Ads"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "schema": [
+            {
+              "id": "campaign_name",
+              "displayName": "campaign_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "product_service",
+              "displayName": "product_service",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "objective",
+              "displayName": "objective",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "platform",
+              "displayName": "platform",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "headline",
+              "displayName": "headline",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "body",
+              "displayName": "body",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "cta",
+              "displayName": "cta",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "image_prompt",
+              "displayName": "image_prompt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "predicted_score",
+              "displayName": "predicted_score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "landing_page",
+              "displayName": "landing_page",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "strategy",
+              "displayName": "strategy",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "generated_at",
+              "displayName": "generated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "bd6a2f62-e666-42c1-8651-b895703b300e",
+      "name": "Save Ads To Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        800,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: \"success\", campaign: $('Campaign Webhook').first().json.body.campaign_name, strategy: $('Ad Architect Agent').first().json.output.strategy, ads_generated: $('Ad Architect Agent').first().json.output.ads.length }) }}",
+        "options": {}
+      },
+      "id": "03544c5f-180d-45da-99bb-ce65542ef695",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1024,
+        0
+      ],
+      "executeOnce": true
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Campaign Webhook": {
+      "main": [
+        [
+          {
+            "node": "Ad Architect Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ad Architect Agent": {
+      "main": [
+        [
+          {
+            "node": "Flatten Ads To Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Ad Architect Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Campaign Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Ad Architect Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Flatten Ads To Rows": {
+      "main": [
+        [
+          {
+            "node": "Save Ads To Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Ads To Sheet": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "46d520c9-ccd6-43a4-aaf9-2bff09a88aa6",
+  "meta": {
+    "instanceId": "9393791e11f7e0af2072efd6934f3844502859c073453a8a604b6222c71a19d9"
+  },
+  "nodeGroups": [],
+  "id": "4biu2Gsx5KHg6nTJ",
+  "tags": []
+}
