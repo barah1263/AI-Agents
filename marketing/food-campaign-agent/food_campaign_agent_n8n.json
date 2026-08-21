@@ -1,0 +1,757 @@
+{
+  "name": "وكيل الحملات الإعلانية الغذائية - Food Campaign Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "food-campaign-agent",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger-001",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [
+        250,
+        300
+      ],
+      "webhookId": "food-campaign-agent"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json.body || $input.first().json;\n\nconst required = ['campaign_name', 'product_category', 'target_audience', 'platforms'];\nconst missing = required.filter(field => !input[field]);\n\nif (missing.length > 0) {\n  return [{\n    json: {\n      status: \"error\",\n      message: `الحقول المفقودة: ${missing.join(', ')}`,\n      code: \"MISSING_FIELDS\",\n      input_data: input\n    }\n  }];\n}\n\nconst supportedPlatforms = ['instagram', 'facebook', 'tiktok', 'snapchat', 'youtube'];\nconst invalidPlatforms = input.platforms.filter(p => !supportedPlatforms.includes(p.toLowerCase()));\n\nif (invalidPlatforms.length > 0) {\n  return [{\n    json: {\n      status: \"error\", \n      message: `منصات غير مدعومة: ${invalidPlatforms.join(', ')}`,\n      code: \"INVALID_PLATFORMS\",\n      input_data: input\n    }\n  }];\n}\n\nconst normalized = {\n  ...input,\n  platforms: input.platforms.map(p => p.toLowerCase()),\n  content_types: input.content_types || ['images'],\n  duration_days: input.duration_days || 30,\n  seasonal_event: input.seasonal_event || 'general',\n  budget_range: input.budget_range || 'غير محدد',\n  special_requests: input.special_requests || '',\n  brand_id: input.brand_id || 'default'\n};\n\nreturn [{\n  json: {\n    status: \"success\",\n    data: normalized,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "validate-input-002",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        450,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "jsonProperty": "={{$json}}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "error-response-003",
+      "name": "Error Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        450,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "brand_dna",
+              "value": "{\n  \"brand_voice\": {\n    \"personality\": [\"طازج\", \"موثوق\", \"عائلي\", \"أصيل\"],\n    \"forbidden_words\": [\"رخيص\", \"قديم\", \"مصنع\", \"تقليد\"],\n    \"signature_phrases\": [\"من المزرعة إلى مائدتك\", \"جودة تستحق الثقة\"]\n  },\n  \"visual_identity\": {\n    \"primary_colors\": [\"#2E7D32\", \"#FF6F00\", \"#F5F5DC\"],\n    \"typography\": \"Noto Kufi Arabic\",\n    \"photography_style\": \"natural_lighting, shallow_depth, warm_tones, rustic_wood_background\"\n  },\n  \"product_catalog\": {\n    \"categories\": [\"خضروات\", \"فواكه\", \"لحوم\", \"معلبات\", \"تمور\"],\n    \"hero_products\": [\"التمر الممتاز\", \"الزيتون البكر\", \"العسل الطبيعي\"]\n  },\n  \"compliance_rules\": {\n    \"health_claims\": false,\n    \"halal_certification\": true,\n    \"organic_claims\": \"requires_certificate\"\n  }\n}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "brand-dna-004",
+      "name": "Load Brand DNA",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        650,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o",
+        "options": {
+          "temperature": 0.7,
+          "maxTokens": 2000
+        },
+        "messages": {
+          "message": [
+            {
+              "role": "system",
+              "content": "أنت \"ذوق\" - وكيل استراتيجي متخصص في الحملات الإعلانية للمواد الغذائية.\n\n# القيود الصارمة:\n- لا تذكر أي مطالبات صحية غير مثبتة\n- تجنب كلمات: \"رخيص\"، \"قديم\"، \"مصنع\"، \"تقليد\"\n- ركز على: \"طازج\"، \"ممتاز\"، \"عائلي\"، \"أصيل\"، \"موثوق\"\n- كل المحتوى باللغة العربية\n- أخرج JSON صالح فقط بدون أي نص إضافي"
+            },
+            {
+              "role": "user",
+              "content": "صمم استراتيجية حملة إعلانية متكاملة:\n\nاسم الحملة: {{ $json.data.campaign_name }}\nفئة المنتج: {{ $json.data.product_category }}\nالجمهور المستهدف: {{ $json.data.target_audience }}\nالميزانية: {{ $json.data.budget_range }}\nالمدة: {{ $json.data.duration_days }} يوم\nالمنصات: {{ $json.data.platforms.join(', ') }}\nالمناسبة: {{ $json.data.seasonal_event }}\nطلبات خاصة: {{ $json.data.special_requests }}\n\nBrand DNA: {{ $json.brand_dna }}\n\nالمطلوب:\n1. الزاوية الإبداعية\n2. نبرة الصوت\n3. الرسالة الرئيسية\n4. لوحة الألوان\n5. خطة المحتوى (نوع + عدد + منصة)\n6. توزيع الميزانية\n7. استراتيجية الهاشتاقات\n\nأخرج JSON صالح فقط:"
+            }
+          ]
+        }
+      },
+      "id": "ai-strategist-005",
+      "name": "AI Campaign Strategist",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1.6,
+      "position": [
+        850,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const strategyText = $input.first().json.message?.content || $input.first().json.content || '';\nlet strategy;\n\ntry {\n  // استخراج JSON من النص\n  const jsonMatch = strategyText.match(/```json\\s*([\\s\\S]*?)```/) || \n                    strategyText.match(/{[\\s\\S]*}/);\n\n  if (jsonMatch) {\n    strategy = JSON.parse(jsonMatch[1] || jsonMatch[0]);\n  } else {\n    strategy = JSON.parse(strategyText);\n  }\n} catch (e) {\n  strategy = {\n    error: true,\n    raw_response: strategyText,\n    parse_error: e.message\n  };\n}\n\nreturn [{\n  json: {\n    ...$input.first().json,\n    strategy: strategy,\n    strategy_valid: !strategy.error\n  }\n}];"
+      },
+      "id": "parse-strategy-006",
+      "name": "Parse Strategy JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1050,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "rules": [
+            {
+              "value": "images",
+              "output": 0,
+              "conditions": [
+                {
+                  "value": "images",
+                  "operator": {
+                    "type": "string",
+                    "operation": "contains"
+                  }
+                }
+              ]
+            },
+            {
+              "value": "videos",
+              "output": 1,
+              "conditions": [
+                {
+                  "value": "videos",
+                  "operator": {
+                    "type": "string",
+                    "operation": "contains"
+                  }
+                }
+              ]
+            },
+            {
+              "value": "copy",
+              "output": 2,
+              "conditions": [
+                {
+                  "value": "copy",
+                  "operator": {
+                    "type": "string",
+                    "operation": "contains"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "dataType": "string",
+        "value1": "={{$json.data.content_types.join(', ')}}",
+        "fallbackOutput": 3
+      },
+      "id": "content-router-007",
+      "name": "Content Type Router",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 2.2,
+      "position": [
+        1250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o",
+        "options": {
+          "temperature": 0.8,
+          "maxTokens": 1500
+        },
+        "messages": {
+          "message": [
+            {
+              "role": "system",
+              "content": "أنت 'عدسة' - مصمم Prompts احترافي لتوليد الصور الإعلانية الغذائية. اكتب Prompts بالإنجليزية لأدوات التوليد."
+            },
+            {
+              "role": "user",
+              "content": "اكتب 3 Prompts لتوليد صور إعلانية:\n\nالحملة: {{ $json.data.campaign_name }}\nالمنتج: {{ $json.data.product_category }}\nالزاوية الإبداعية: {{ $json.strategy.creative_angle }}\nنبرة الصوت: {{ $json.strategy.tone_of_voice }}\nالمنصات: {{ $json.data.platforms.join(', ') }}\n\nBrand DNA: {{ $json.brand_dna }}\n\nالمطلوب:\n- 3 Prompts بالإنجليزية (لـ DALL-E 3)\n- وصف عربي لكل صورة\n- الأبعاد المناسبة لكل منصة\n- Negative Prompts\n\nأخرج JSON فقط:"
+            }
+          ]
+        }
+      },
+      "id": "image-prompt-008a",
+      "name": "Image Prompt Engineer",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1.6,
+      "position": [
+        1450,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/images/generations",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "body": {
+          "model": "dall-e-3",
+          "prompt": "={{$json.message?.content?.match(/Prompt 1[\\s\\S]*?English:[\\s]*([^\\n]+)/)?.[1] || 'Professional food photography, ' + $json.data.product_category + ', warm lighting, rustic wooden table, natural colors, high quality, 8k'}}",
+          "size": "1024x1024",
+          "quality": "hd",
+          "n": 1,
+          "style": "vivid"
+        },
+        "options": {}
+      },
+      "id": "generate-images-008a2",
+      "name": "Generate Images (DALL-E)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1650,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o",
+        "options": {
+          "temperature": 0.8,
+          "maxTokens": 2000
+        },
+        "messages": {
+          "message": [
+            {
+              "role": "system",
+              "content": "أنت 'مخرج' - كاتب سكريبتات فيديو إعلانية غذائية قصيرة."
+            },
+            {
+              "role": "user",
+              "content": "اكتب سكريبت فيديو إعلاني:\n\nالحملة: {{ $json.data.campaign_name }}\nالمنتج: {{ $json.data.product_category }}\nالمدة: 15-30 ثانية\nالمنصة: {{ $json.data.platforms[0] }}\nالزاوية: {{ $json.strategy.creative_angle }}\n\nBrand DNA: {{ $json.brand_dna }}\n\nالمطلوب:\n- Hook (0-3 ثواني)\n- 3 مشاهد مع وصف بصري\n- نصوص على الشاشة\n- Voice Over\n- CTA\n- وصف الموسيقى\n\nأخرج JSON فقط:"
+            }
+          ]
+        }
+      },
+      "id": "video-script-008b",
+      "name": "Video Script Writer",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1.6,
+      "position": [
+        1450,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.runwayml.com/v1/generations",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "body": {
+          "prompt": "={{$json.message?.content?.substring(0, 500) || 'Food commercial video, ' + $json.data.product_category}}",
+          "duration": 5,
+          "ratio": "={{$json.data.platforms.includes('tiktok') || $json.data.platforms.includes('instagram') ? '9:16' : '16:9'}}"
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "generate-video-008b2",
+      "name": "Generate Video (Runway)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1650,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o",
+        "options": {
+          "temperature": 0.9,
+          "maxTokens": 2000
+        },
+        "messages": {
+          "message": [
+            {
+              "role": "system",
+              "content": "أنت 'قلم' - كاتب إعلاني متخصص في المواد الغذائية. تكتب نصوصاً جذابة بالعربية."
+            },
+            {
+              "role": "user",
+              "content": "اكتب محتوى إعلاني:\n\nالحملة: {{ $json.data.campaign_name }}\nالمنتج: {{ $json.data.product_category }}\nالجمهور: {{ $json.data.target_audience }}\nالمنصات: {{ $json.data.platforms.join(', ') }}\nنبرة الصوت: {{ $json.strategy.tone_of_voice }}\nالرسالة: {{ $json.strategy.key_message }}\n\nBrand DNA: {{ $json.brand_dna }}\n\nالمطلوب:\n- 5 Hooks قوية\n- 5 كابشنز كاملة\n- 10 هاشتاقات\n- 3 CTAs\n- نصوص مخصصة لكل منصة\n\nأخرج JSON فقط:"
+            }
+          ]
+        }
+      },
+      "id": "copywriter-008c",
+      "name": "Copywriter",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1.6,
+      "position": [
+        1450,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "mergeByIndex"
+      },
+      "id": "merge-results-009",
+      "name": "Merge Results",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [
+        1850,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "approval_package",
+              "value": "={{$json}}"
+            },
+            {
+              "name": "campaign_id",
+              "value": "={{new Date().getTime()}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "approval-prep-010",
+      "name": "Prepare Approval Package",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2050,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {
+          "webhookSuffix": "={{$json.campaign_id}}",
+          "maxWaitTime": 172800
+        }
+      },
+      "id": "wait-approval-011",
+      "name": "Wait for Approval",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2250,
+        300
+      ],
+      "webhookId": "approve-campaign"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "condition-0",
+              "leftValue": "={{$json.body?.decision || $json.decision}}",
+              "rightValue": "approved",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      },
+      "id": "check-approval-012",
+      "name": "Check Approval",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2450,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v18.0/me/media",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendBody": true,
+        "contentType": "json",
+        "body": {
+          "image_url": "={{$json.approval_package?.image_url || 'https://example.com/placeholder.jpg'}}",
+          "caption": "={{$json.approval_package?.caption || $json.approval_package?.strategy?.key_message || 'حملة غذائية ممتازة'}}",
+          "access_token": "={{$credentials.metaAccessToken}}"
+        },
+        "options": {}
+      },
+      "id": "publish-instagram-013a",
+      "name": "Publish to Instagram",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2650,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Campaigns",
+          "mode": "list"
+        },
+        "columns": {
+          "column": [
+            {
+              "id": "campaign_id",
+              "columnId": "A"
+            },
+            {
+              "id": "campaign_name",
+              "columnId": "B"
+            },
+            {
+              "id": "platform",
+              "columnId": "C"
+            },
+            {
+              "id": "content_type",
+              "columnId": "D"
+            },
+            {
+              "id": "publish_date",
+              "columnId": "E"
+            },
+            {
+              "id": "status",
+              "columnId": "F"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "log-sheets-013b",
+      "name": "Log to Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        2650,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "jsonProperty": "={{$json}}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "success-response-014",
+      "name": "Success Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2850,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const error = $input.first().json;\nconst errorLog = {\n  timestamp: new Date().toISOString(),\n  workflow: \"food_campaign_agent\",\n  node: error.error?.node?.name || \"unknown\",\n  error_message: error.error?.message || error.message || \"Unknown error\",\n  error_code: error.error?.code || \"UNKNOWN\",\n  input_data: JSON.stringify(error.input || {})\n};\n\nreturn [{\n  json: {\n    status: \"error\",\n    error_log: errorLog,\n    user_message: \"حدث خطأ في معالجة الحملة. فريقنا يعمل على إصلاحه. يرجى المحاولة لاحقاً.\",\n    retry_needed: true,\n    retry_count: 0\n  }\n}];"
+      },
+      "id": "error-handler-015",
+      "name": "Global Error Handler",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        650,
+        500
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "Load Brand DNA",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Brand DNA": {
+      "main": [
+        [
+          {
+            "node": "AI Campaign Strategist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Campaign Strategist": {
+      "main": [
+        [
+          {
+            "node": "Parse Strategy JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Strategy JSON": {
+      "main": [
+        [
+          {
+            "node": "Content Type Router",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Content Type Router": {
+      "main": [
+        [
+          {
+            "node": "Image Prompt Engineer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Video Script Writer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Copywriter",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Image Prompt Engineer": {
+      "main": [
+        [
+          {
+            "node": "Generate Images (DALL-E)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Images (DALL-E)": {
+      "main": [
+        [
+          {
+            "node": "Merge Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Video Script Writer": {
+      "main": [
+        [
+          {
+            "node": "Generate Video (Runway)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Video (Runway)": {
+      "main": [
+        [
+          {
+            "node": "Merge Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Copywriter": {
+      "main": [
+        [
+          {
+            "node": "Merge Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Results": {
+      "main": [
+        [
+          {
+            "node": "Prepare Approval Package",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Approval Package": {
+      "main": [
+        [
+          {
+            "node": "Wait for Approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Approval": {
+      "main": [
+        [
+          {
+            "node": "Check Approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Approval": {
+      "main": [
+        [
+          {
+            "node": "Publish to Instagram",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log to Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish to Instagram": {
+      "main": [
+        [
+          {
+            "node": "Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log to Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "",
+    "timezone": "Asia/Riyadh",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveExecutionProgress": true,
+    "executionTimeout": 3600
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "food",
+      "id": "tag-food"
+    },
+    {
+      "name": "marketing",
+      "id": "tag-marketing"
+    },
+    {
+      "name": "ai-agent",
+      "id": "tag-ai"
+    }
+  ]
+}
